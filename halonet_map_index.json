@@ -1,0 +1,34 @@
+{
+  "format_version": 1,
+  "complete": false,
+  "source": "Seed entries verified against HaloNet map listing; run updater for full index.",
+  "generated_utc": null,
+  "map_count": 8,
+  "key_count": 8,
+  "index": {
+    "new_mombasa_chaos": [
+      "New_Mombasa_Chaos"
+    ],
+    "new_mombasa_h2_v2": [
+      "New_Mombasa_H2_v2"
+    ],
+    "new_mombasa_mod": [
+      "New_Mombasa_Mod"
+    ],
+    "new_mombasa_odst": [
+      "New_Mombasa_odst"
+    ],
+    "new_mombasa_race": [
+      "New_Mombasa_Race"
+    ],
+    "new_mombasa_race_v2": [
+      "New_Mombasa_Race_v2"
+    ],
+    "bmt_new_mombasa": [
+      "BMT_New_Mombasa"
+    ],
+    "blood_glade": [
+      "Blood_Glade"
+    ]
+  }
+}
