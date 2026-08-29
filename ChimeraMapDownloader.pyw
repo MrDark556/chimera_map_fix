@@ -15,7 +15,7 @@ from tkinter import ttk
 
 import chimera_hybrid_downloader as proxy
 
-VERSION = "3.6"
+VERSION = "3.6.1"
 STATE_DIR = proxy.BASE_DIR
 CONFIG_FILE = STATE_DIR / "launcher_config.ini"
 LOG_FILE = STATE_DIR / "launcher.log"
@@ -69,11 +69,14 @@ def release_dir():
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
-def common_halo_paths():
-    paths = [
-        release_dir() / "haloce.exe",
-        Path.cwd() / "haloce.exe",
-    ]
+def launcher_halo_path():
+    """Return haloce.exe beside the launcher EXE/source."""
+    return release_dir() / "haloce.exe"
+
+
+def standard_halo_paths():
+    """Return common Halo Custom Edition install locations."""
+    paths = []
 
     pf86 = os.environ.get("ProgramFiles(x86)")
     pf = os.environ.get("ProgramFiles")
@@ -95,29 +98,47 @@ def common_halo_paths():
             root / "Microsoft Games" / "Halo Custom Edition" / "haloce.exe",
         ])
 
+    unique = []
     seen = set()
-    result = []
-    for p in paths:
-        key = str(p).lower()
+    for path in paths:
+        key = str(path).lower()
         if key not in seen:
             seen.add(key)
-            result.append(p)
-    return result
+            unique.append(path)
+    return unique
 
-def find_halo():
+
+def save_halo_path(path):
     cfg = load_config()
-    saved = cfg.get("launcher", "halo_exe", fallback="").strip()
+    cfg.set("launcher", "halo_exe", str(Path(path).resolve()))
+    save_config(cfg)
 
-    if saved and valid_halo(saved):
-        return Path(saved)
 
-    for candidate in common_halo_paths():
-        if valid_halo(candidate):
-            cfg.set("launcher", "halo_exe", str(candidate))
-            save_config(cfg)
-            return candidate
+def ask_to_confirm_detected_halo(path):
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
 
-    # Unusual install: ask once and remember it.
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+
+        answer = messagebox.askyesno(
+            "Chimera Map Downloader",
+            "Halo Custom Edition was found here:\n\n"
+            f"{path}\n\n"
+            "Is this the Halo CE installation you want to use?\n\n"
+            "Choose No if you want to locate a different haloce.exe.",
+            parent=root,
+        )
+        root.destroy()
+        return bool(answer)
+    except Exception as e:
+        log(f"Confirmation dialog failed: {type(e).__name__}: {e}")
+        return False
+
+
+def browse_for_halo():
     try:
         import tkinter as tk
         from tkinter import filedialog, messagebox
@@ -128,30 +149,85 @@ def find_halo():
 
         messagebox.showinfo(
             "Chimera Map Downloader",
-            "Halo Custom Edition could not be found automatically.\n\n"
-            "Select haloce.exe once. The location will be remembered.",
+            "Halo Custom Edition could not be confirmed automatically.\n\n"
+            "Please locate your Halo CE installation and select haloce.exe.\n\n"
+            "Portable Halo CE installations are fully supported.",
             parent=root,
         )
 
         selected = filedialog.askopenfilename(
             parent=root,
-            title="Select haloce.exe",
+            title="Select your Halo Custom Edition haloce.exe",
             filetypes=[
                 ("Halo Custom Edition", "haloce.exe"),
                 ("Executable files", "*.exe"),
             ],
         )
-        root.destroy()
 
-        if selected and valid_halo(selected):
-            cfg.set("launcher", "halo_exe", selected)
-            save_config(cfg)
-            return Path(selected)
+        if not selected:
+            root.destroy()
+            return None
+
+        if not valid_halo(selected):
+            messagebox.showerror(
+                "Chimera Map Downloader",
+                "The selected file is not haloce.exe.\n\n"
+                "Please select the original Halo Custom Edition haloce.exe file.",
+                parent=root,
+            )
+            root.destroy()
+            return None
+
+        root.destroy()
+        selected_path = Path(selected).resolve()
+        save_halo_path(selected_path)
+        log(f"User selected Halo CE: {selected_path}")
+        return selected_path
 
     except Exception as e:
         log(f"File picker failed: {type(e).__name__}: {e}")
+        return None
 
-    return None
+
+def find_halo():
+    # 1. Portable/same-folder install always wins over stale saved paths.
+    beside_launcher = launcher_halo_path()
+    if valid_halo(beside_launcher):
+        resolved = beside_launcher.resolve()
+        save_halo_path(resolved)
+        log(f"Halo CE found beside launcher: {resolved}")
+        return resolved
+
+    # 2. Previously confirmed location.
+    cfg = load_config()
+    saved = cfg.get("launcher", "halo_exe", fallback="").strip()
+
+    if saved and valid_halo(saved):
+        resolved = Path(saved).resolve()
+        log(f"Using saved Halo CE location: {resolved}")
+        return resolved
+
+    if saved:
+        log("Saved Halo CE location is no longer valid; searching again.")
+
+    # 3. Search common locations, but ask before using one.
+    for candidate in standard_halo_paths():
+        if not valid_halo(candidate):
+            continue
+
+        resolved = candidate.resolve()
+        log(f"Possible Halo CE installation found: {resolved}")
+
+        if ask_to_confirm_detected_halo(resolved):
+            save_halo_path(resolved)
+            log(f"User confirmed Halo CE location: {resolved}")
+            return resolved
+
+        log("User rejected detected Halo CE location; opening manual picker.")
+        return browse_for_halo()
+
+    # 4. Nothing found: manual selection.
+    return browse_for_halo()
 
 def port_open():
     try:
@@ -455,8 +531,10 @@ def main():
     halo = find_halo()
     if halo is None:
         show_error(
-            "haloce.exe could not be located.\n\n"
-            "The launcher has stopped."
+            "No valid haloce.exe was selected.\n\n"
+            "Keep your original haloce.exe and place the map downloader "
+            "beside it, or run the launcher again and select the correct "
+            "Halo Custom Edition executable."
         )
         return 1
 

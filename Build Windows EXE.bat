@@ -4,7 +4,7 @@ title Build Chimera Map Downloader EXE
 cd /d "%~dp0"
 
 echo ============================================================
-echo  Chimera Hybrid Map Downloader v3.6 - Windows EXE Builder
+echo  Chimera Hybrid Map Downloader v3.6.1 - Windows EXE Builder
 echo ============================================================
 echo.
 
