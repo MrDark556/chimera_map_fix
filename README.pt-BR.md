@@ -13,7 +13,6 @@ Quando o Chimera solicita um mapa personalizado que você não tem, o downloader
 ### 1. Baixe o lançador
 
 
-
 Você pode colocar o arquivo EXE onde for mais conveniente.
 
 ### 2. Edite `chimera.ini`
