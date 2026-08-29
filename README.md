@@ -15,7 +15,15 @@ When Chimera requests a custom map you don't have, the downloader automatically 
 ### 1. Download the launcher
 
 
-You can place the EXE file wherever is convenient for you.
+Place `haloce_chimera_mpdlr.exe` in the **same folder as the original `haloce.exe` you use with Chimera**. This is the recommended setup, especially for portable Halo CE installations.
+
+If needed, the saved Halo location can also be edited in:
+
+```text
+%LOCALAPPDATA%\ChimeraHybridMapDownloader\launcher_config.ini
+```
+
+Normally, simply placing the launcher beside the correct `haloce.exe` and running it is enough.
 
 ### 2. Edit `chimera.ini`
 
@@ -222,17 +230,19 @@ The public release of `ChimeraMapDownloader.exe` does **not** require Python to 
 
 ---
 
-## Windows SmartScreen
+## Windows SmartScreen / Antivirus
 
-The executable may show an **Unknown Publisher** warning or Windows SmartScreen prompt because it isn't digitally signed.
+You should **not need to disable your antivirus** to use the map downloader.
 
-This is normal for unsigned community executables.
+Because the EXE is an unsigned community-made program built with PyInstaller, Windows SmartScreen or some antivirus products may occasionally show an **Unknown Publisher** warning or false positive. If this happens, verify that the file came from the official project release and allow/restore **only this specific EXE** if you trust it.
+
+Do **not** disable your antivirus completely.
 
 ---
 
 ## Quick setup
 
-1. [Download](https://github.com/MrDark556/chimera_map_fix/releases/download/v3.5/haloce_chimera_mpdlr.exe) `ChimeraMapDownloader.exe`
+1. [Download](https://github.com/MrDark556/chimera_map_fix/releases/download/v3.5/haloce_chimera_mpdlr.exe) `haloce_chimera_mpdlr.exe` and place it beside the `haloce.exe` you use with Chimera.
 2. Open `chimera.ini`.
 3. Under `[memory]`, set:
 

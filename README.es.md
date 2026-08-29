@@ -14,7 +14,17 @@ Cuando Chimera solicita un mapa personalizado que no tienes, el descargador inte
 
 ### 1. Descarga el lanzador
 
-Puedes colocar el archivo EXE donde te resulte más conveniente.
+Para la versión en español, usa **`haloce_chimera_mpdlr_es.exe`**.
+
+Coloca `haloce_chimera_mpdlr_es.exe` en la **misma carpeta que el `haloce.exe` original que usas con Chimera**. Este es el método recomendado, especialmente para instalaciones portátiles de Halo CE.
+
+Si es necesario, también puedes editar manualmente la ubicación guardada de Halo en:
+
+```text
+%LOCALAPPDATA%\ChimeraHybridMapDownloader\launcher_config.ini
+```
+
+Normalmente, basta con colocar el archivo junto al `haloce.exe` correcto y ejecutarlo.
 
 ### 2. Edita `chimera.ini`
 
@@ -76,10 +86,10 @@ Si HaloNet falla y el programa necesita usar una de las fuentes alternativas, ap
 
 ## Iniciar Halo
 
-Después de configurar Chimera, inicia Halo Custom Edition usando:
+Después de configurar Chimera, inicia Halo Custom Edition usando la versión en español:
 
 ```text
-haloce_chimera_mpdlr.exe
+haloce_chimera_mpdlr_es.exe
 ```
 
 Si quieres que el descargador se inicie automáticamente, **no abras `haloce.exe` directamente**.
@@ -97,17 +107,15 @@ No se muestra ninguna ventana de Símbolo del sistema ni de BAT.
 
 ## Primer inicio
 
-El lanzador intentará encontrar `haloce.exe` automáticamente.
+El lanzador primero busca `haloce.exe` en la **misma carpeta que el descargador**. Si lo encuentra, usará automáticamente esa instalación.
 
-Si Halo Custom Edition está instalado en una ubicación no estándar, se te pedirá que selecciones:
+De lo contrario, puede usar una ubicación guardada previamente o buscar en las ubicaciones comunes de Halo CE. Si encuentra una instalación estándar, te preguntará si esa es la correcta. Si no lo es, podrás seleccionar manualmente tu `haloce.exe`.
+
+La ubicación confirmada se guarda para futuros inicios en:
 
 ```text
-haloce.exe
+%LOCALAPPDATA%\ChimeraHybridMapDownloader\launcher_config.ini
 ```
-
-una sola vez.
-
-La ubicación se guardará para futuros inicios.
 
 ---
 
@@ -217,21 +225,23 @@ Si un mapa no se descarga, incluye lo siguiente al reportar el problema:
 - Halo Custom Edition
 - Chimera
 
-La versión pública de `haloce_chimera_mpdlr.exe` **no** requiere que Python esté instalado.
+La versión pública en español, `haloce_chimera_mpdlr_es.exe`, **no** requiere que Python esté instalado.
 
 ---
 
-## Windows SmartScreen
+## Windows SmartScreen / Antivirus
 
-El ejecutable puede mostrar una advertencia de **Editor desconocido** o Windows SmartScreen porque no está firmado digitalmente.
+**No es necesario desactivar el antivirus** para usar el descargador de mapas.
 
-Esto es normal para ejecutables comunitarios sin firma digital.
+Como el EXE es un programa comunitario sin firma digital y está compilado con PyInstaller, Windows SmartScreen o algunos antivirus pueden mostrar una advertencia de **Editor desconocido** o un falso positivo. Si ocurre, verifica que el archivo provenga de la fuente oficial y permite/restaura **solo este EXE** si confías en él.
+
+No desactives completamente tu antivirus.
 
 ---
 
 ## Configuración rápida
 
-1. [Download](https://github.com/MrDark556/chimera_map_fix/releases/download/v3.5/haloce_chimera_mpdlr.exe) `ChimeraMapDownloader.exe`
+1. Obtén **`haloce_chimera_mpdlr_es.exe`** (la versión en español; también puede distribuirse directamente por Discord) y colócala junto al `haloce.exe` que usas con Chimera.
 2. Abre `chimera.ini`.
 3. En `[memory]`, configura:
 
@@ -243,7 +253,7 @@ download_template=http://127.0.0.1:8765/{map}
 5. Inicia Halo usando:
 
 ```text
-haloce_chimera_mpdlr.exe
+haloce_chimera_mpdlr_es.exe
 ```
 
 6. Únete a los servidores normalmente.
