@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Chimera Hybrid Map Downloader / Local Compatibility Proxy v3.5
+# Chimera Hybrid Map Downloader / Local Compatibility Proxy v3.6
 # Priority:
 # 1. HaloNet normal locator (.inv/raw payload)
 # 2. HaloNet static ZIP fallback
@@ -25,6 +25,7 @@ import zipfile
 import json
 import queue
 import os
+import sys
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -105,9 +106,23 @@ def runtime_state_dir():
     path.mkdir(parents=True, exist_ok=True)
     return path
 
+def bundled_resource_path(filename):
+    """
+    Return a file bundled into a PyInstaller one-file build, or a file beside
+    the Python source when running uncompiled.
+    """
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return Path(sys._MEIPASS) / filename
+    return Path(__file__).resolve().parent / filename
+
 BASE_DIR = runtime_state_dir()
 LOG_FILE = BASE_DIR / "chimera_downloader.log"
 CACHE_DIR = BASE_DIR / "cache"
+
+# A user/developer can optionally drop a newer index into Local AppData
+# without rebuilding. Otherwise the copy embedded in the EXE is used.
+HALONET_INDEX_OVERRIDE = BASE_DIR / "halonet_map_index.json"
+HALONET_INDEX_BUNDLED = bundled_resource_path("halonet_map_index.json")
 CE3_ENTRY_CACHE = CACHE_DIR / "ce3_entries.json"
 CE3_RAW_CACHE_DIR = CACHE_DIR / "ce3_raw"
 CE3_ZIP_CACHE_DIR = CACHE_DIR / "ce3_zips"
@@ -471,7 +486,7 @@ def download_to_file(url, destination, timeout, user_agent):
             temp.unlink()
         raise
 
-def http_get_bytes(url, timeout, user_agent="Chimera-Hybrid-Map-Downloader/3.5"):
+def http_get_bytes(url, timeout, user_agent="Chimera-Hybrid-Map-Downloader/3.6"):
     req = Request(url, headers={"User-Agent": user_agent, "Accept": "*/*"})
     socket_timeout = min(max(0.5, timeout), NETWORK_STALL_TIMEOUT)
 
@@ -487,7 +502,7 @@ def http_get_bytes(url, timeout, user_agent="Chimera-Hybrid-Map-Downloader/3.5")
 
     return status, content_type, final_url, data
 
-def http_get_text(url, timeout, user_agent="Chimera-Hybrid-Map-Downloader/3.5"):
+def http_get_text(url, timeout, user_agent="Chimera-Hybrid-Map-Downloader/3.6"):
     status, content_type, final_url, data = http_get_bytes(url, timeout, user_agent)
     encoding = "utf-8"
     m = re.search(r"charset=([^\s;]+)", content_type or "", re.I)
@@ -509,7 +524,7 @@ def try_primary(map_name):
     log(f"[PRIMARY] Trying HaloNet locator for {map_name}")
     try:
         final_url, _, size = download_to_file(
-            url, cache_path, PRIMARY_CONNECT_TIMEOUT, "Chimera-Hybrid-Map-Downloader/3.5"
+            url, cache_path, PRIMARY_CONNECT_TIMEOUT, "Chimera-Hybrid-Map-Downloader/3.6"
         )
         log(f"[PRIMARY] Success ({size / 1024 / 1024:.1f} MiB)")
         if final_url != url:
@@ -564,6 +579,165 @@ def extract_map_from_zip(zip_path, map_name, raw_map_path):
             temp_map.unlink()
         raise
 
+_HALONET_INDEX_LOCK = threading.Lock()
+_HALONET_INDEX_LOADED = False
+_HALONET_STATIC_INDEX = {}
+_HALONET_INDEX_META = {}
+
+
+def load_halonet_static_index():
+    """
+    Load the shipped HaloNet exact-filename index.
+
+    Format:
+        {
+          "format_version": 1,
+          "complete": true,
+          "map_count": 7124,
+          "index": {
+             "new_mombasa_race": ["New_Mombasa_Race"],
+             ...
+          }
+        }
+
+    Keys are casefolded map names. Values are lists because two historical
+    filenames could theoretically differ only by case.
+    """
+    global _HALONET_INDEX_LOADED
+    global _HALONET_STATIC_INDEX
+    global _HALONET_INDEX_META
+
+    if _HALONET_INDEX_LOADED:
+        return _HALONET_STATIC_INDEX
+
+    with _HALONET_INDEX_LOCK:
+        if _HALONET_INDEX_LOADED:
+            return _HALONET_STATIC_INDEX
+
+        chosen = None
+        for candidate in (HALONET_INDEX_OVERRIDE, HALONET_INDEX_BUNDLED):
+            try:
+                if candidate.exists() and candidate.is_file():
+                    chosen = candidate
+                    break
+            except Exception:
+                continue
+
+        index = {}
+        meta = {}
+
+        if chosen is not None:
+            try:
+                with open(chosen, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+
+                raw_index = payload.get("index", {})
+                if not isinstance(raw_index, dict):
+                    raise ValueError("index field is not an object")
+
+                for key, values in raw_index.items():
+                    folded = str(key).casefold()
+                    if isinstance(values, str):
+                        values = [values]
+                    if not isinstance(values, list):
+                        continue
+
+                    cleaned = []
+                    for value in values:
+                        value = str(value).strip()
+                        if value and value not in cleaned:
+                            cleaned.append(value)
+
+                    if cleaned:
+                        index[folded] = cleaned
+
+                meta = {
+                    "path": str(chosen),
+                    "map_count": payload.get("map_count"),
+                    "complete": bool(payload.get("complete", False)),
+                    "generated_utc": payload.get("generated_utc"),
+                    "source": payload.get("source"),
+                }
+
+                log(
+                    "[HALONET-INDEX] Loaded "
+                    f"{len(index)} case-insensitive keys / "
+                    f"{payload.get('map_count', '?')} filenames "
+                    f"from {chosen}"
+                )
+
+                if not meta["complete"]:
+                    log(
+                        "[HALONET-INDEX] WARNING: shipped index is marked "
+                        "incomplete; heuristic case probes remain enabled"
+                    )
+
+            except Exception as e:
+                log(
+                    "[HALONET-INDEX] Failed to load "
+                    f"{chosen}: {type(e).__name__}: {e}"
+                )
+
+        else:
+            log(
+                "[HALONET-INDEX] No bundled index found; "
+                "using capitalization heuristics only"
+            )
+
+        _HALONET_STATIC_INDEX = index
+        _HALONET_INDEX_META = meta
+        _HALONET_INDEX_LOADED = True
+        return _HALONET_STATIC_INDEX
+
+
+def halonet_indexed_names(map_name):
+    index = load_halonet_static_index()
+    return list(index.get(str(map_name).casefold(), []))
+
+
+def halonet_static_name_candidates(map_name):
+    """
+    Build a bounded list of HaloNet static ZIP filename candidates.
+
+    Priority:
+      1. Exact map name requested by Chimera.
+      2. Exact capitalization from the shipped HaloNet filename index.
+      3. Legacy capitalization guesses as a safety net.
+
+    Chimera/Halo commonly lowercases internal map names, while HaloNet's
+    /maps/ static URL is case-sensitive. The shipped index removes the need
+    to guess names such as BMT_New_Mombasa or New_Mombasa_Race.
+    """
+    candidates = []
+
+    def add(value):
+        value = str(value).strip()
+        if value and value not in candidates:
+            candidates.append(value)
+
+    # Fast path: many files are already stored lowercase.
+    add(map_name)
+
+    # Canonical names from the shipped cache.
+    for canonical_name in halonet_indexed_names(map_name):
+        add(canonical_name)
+
+    # Heuristic safety net for a newly-added HaloNet map that has not yet made
+    # it into our shipped cache.
+    add(map_name.title())
+
+    add("_".join(
+        part[:1].upper() + part[1:] if part else part
+        for part in map_name.split("_")
+    ))
+
+    add(map_name[:1].upper() + map_name[1:] if map_name else map_name)
+    add(map_name.lower())
+    add(map_name.upper())
+
+    return candidates
+
+
 def try_static_zip_fallback(map_name):
     raw_map = RAW_MAP_CACHE_DIR / f"{safe_filename(map_name)}.map"
     zip_path = ZIP_CACHE_DIR / f"{safe_filename(map_name)}.zip"
@@ -572,32 +746,91 @@ def try_static_zip_fallback(map_name):
             log(f"[FALLBACK-1] Raw map cache hit: {map_name}")
             return raw_map, "fallback-zip-cache"
         raw_map.unlink()
-    url = STATIC_ZIP.format(map=quote(map_name, safe="._-()[] "))
     if not zip_path.exists():
-        log(f"[FALLBACK-1] Downloading HaloNet ZIP: {url}")
-        progress_stage("Downloading", source="HaloNet ZIP", track_bytes=True, reset_transfer=True)
         temp = zip_path.with_suffix(".zip.part")
-        request = Request(url, headers={
-            "User-Agent": "Chimera-Hybrid-Map-Downloader/3.5",
-            "Accept": "application/zip,*/*",
-        })
-        try:
-            with urlopen(
-                request,
-                timeout=min(FALLBACK_CONNECT_TIMEOUT, NETWORK_STALL_TIMEOUT),
-            ) as response:
-                with open(temp, "wb") as f:
-                    copy_response_bounded(
-                        response,
-                        f,
-                        UPSTREAM_FILE_BUDGET,
-                        label=f"HaloNet ZIP {map_name}",
+        candidates = halonet_static_name_candidates(map_name)
+        last_error = None
+        downloaded = False
+
+        for index, static_name in enumerate(candidates, start=1):
+            url = STATIC_ZIP.format(map=quote(static_name, safe="._-()[] "))
+            indexed_names = halonet_indexed_names(map_name)
+            candidate_origin = (
+                "index"
+                if static_name in indexed_names and static_name != map_name
+                else "probe"
+            )
+            log(
+                f"[FALLBACK-1] HaloNet ZIP candidate "
+                f"{index}/{len(candidates)} ({candidate_origin}): {url}"
+            )
+
+            request = Request(url, headers={
+                "User-Agent": "Chimera-Hybrid-Map-Downloader/3.6",
+                "Accept": "application/zip,*/*",
+            })
+
+            try:
+                # Only switch the UI into real transfer mode once a response
+                # is successfully opened. 404 probes should not reset the
+                # displayed transfer speed/percentage repeatedly.
+                with urlopen(
+                    request,
+                    timeout=min(FALLBACK_CONNECT_TIMEOUT, NETWORK_STALL_TIMEOUT),
+                ) as response:
+                    progress_stage(
+                        "Downloading",
+                        source="HaloNet ZIP",
+                        track_bytes=True,
+                        reset_transfer=True,
                     )
-            temp.replace(zip_path)
-        except Exception:
-            if temp.exists():
-                temp.unlink()
-            raise
+                    with open(temp, "wb") as f:
+                        copy_response_bounded(
+                            response,
+                            f,
+                            UPSTREAM_FILE_BUDGET,
+                            label=f"HaloNet ZIP {static_name}",
+                        )
+
+                temp.replace(zip_path)
+                log(
+                    f"[FALLBACK-1] HaloNet static filename matched: "
+                    f"{static_name}.zip"
+                )
+                downloaded = True
+                break
+
+            except HTTPError as e:
+                last_error = e
+                if temp.exists():
+                    temp.unlink()
+
+                if e.code == 404:
+                    log(
+                        f"[FALLBACK-1] Static filename not found "
+                        f"({static_name}.zip); trying next case variant"
+                    )
+                    continue
+
+                # Other HTTP errors are source/server errors rather than a
+                # capitalization miss.
+                raise
+
+            except Exception as e:
+                last_error = e
+                if temp.exists():
+                    temp.unlink()
+                raise
+
+        if not downloaded:
+            if last_error is not None:
+                raise RuntimeError(
+                    f"HaloNet static ZIP was not found for {map_name} "
+                    f"after trying {len(candidates)} capitalization variants"
+                ) from last_error
+            raise RuntimeError(
+                f"HaloNet static ZIP was not found for {map_name}"
+            )
     else:
         log(f"[FALLBACK-1] ZIP cache hit: {map_name}")
         progress_stage("Using cached archive", source="HaloNet ZIP", track_bytes=False)
@@ -669,7 +902,7 @@ def ce3_session():
 
 def ce3_get_bytes(opener, url, timeout, referer=None):
     headers = {
-        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.5",
+        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.6",
         "Accept": "*/*",
     }
     if referer:
@@ -1264,7 +1497,7 @@ def halomaps_session():
 
 def opener_get_bytes(opener, url, timeout=HALOMAPS_LOOKUP_TIMEOUT, referer=None):
     headers = {
-        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.5",
+        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.6",
         "Accept": "*/*",
     }
     if referer:
@@ -1371,7 +1604,7 @@ def discover_halomaps_detail(map_name, opener):
                 HALOMAPS_INDEX,
                 data=post_data,
                 headers={
-                    "User-Agent": "Chimera-Hybrid-Map-Downloader/3.5",
+                    "User-Agent": "Chimera-Hybrid-Map-Downloader/3.6",
                     "Content-Type": "application/x-www-form-urlencoded",
                     "Accept": "text/html,*/*",
                     "Referer": HALOMAPS_INDEX,
@@ -1547,7 +1780,7 @@ def extract_download_actions(page_url, page_html):
 
 def request_halomaps_action(opener, method, url, fields, referer):
     headers = {
-        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.5",
+        "User-Agent": "Chimera-Hybrid-Map-Downloader/3.6",
         "Accept": "*/*",
         "Referer": referer,
     }
@@ -1765,7 +1998,7 @@ def resolve_map_with_watchdog(map_name):
     raise value
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "ChimeraHybridMapDownloader/3.5"
+    server_version = "ChimeraHybridMapDownloader/3.6"
     def log_message(self, fmt, *args):
         log("[HTTP] " + (fmt % args))
     def requested_map(self):
@@ -1854,7 +2087,7 @@ class Handler(BaseHTTPRequestHandler):
 def print_banner():
     print()
     print("=" * 70)
-    print("  Chimera Hybrid Map Downloader v3.5")
+    print("  Chimera Hybrid Map Downloader v3.6")
     print("=" * 70)
     print(f"  Local address: http://{HOST}:{PORT}/")
     print()

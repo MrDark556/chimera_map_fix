@@ -15,7 +15,7 @@ from tkinter import ttk
 
 import chimera_hybrid_downloader as proxy
 
-VERSION = "3.5"
+VERSION = "3.6"
 STATE_DIR = proxy.BASE_DIR
 CONFIG_FILE = STATE_DIR / "launcher_config.ini"
 LOG_FILE = STATE_DIR / "launcher.log"

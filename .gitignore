@@ -3,3 +3,6 @@ dist/
 RELEASE/
 __pycache__/
 *.pyc
+.pyinstaller/
+RELEASE/
+*.spec
