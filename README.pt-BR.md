@@ -243,7 +243,7 @@ download_template=http://127.0.0.1:8765/{map}
 5. Inicie o Halo usando:
 
 ```text
-ChimeraMapDownloader.exe
+haloce_chimera_mpdlr.exe
 ```
 
 6. Entre nos servidores normalmente.
