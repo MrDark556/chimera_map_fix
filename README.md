@@ -4,6 +4,8 @@
 
 A lightweight map downloader and launcher for **Halo Custom Edition + Chimera**.
 
+This project was co-authored by Mark and Dark
+
 This tool is mainly meant for players who have trouble with Chimera's normal HaloNet map downloader, although anyone can use it.
 
 When Chimera requests a custom map you don't have, the downloader automatically tries several Halo CE map sources until it finds a working copy.
